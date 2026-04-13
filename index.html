@@ -243,21 +243,6 @@
   </div>
 </div>
 
-<!-- PIN MODAL -->
-<div class="modal-overlay hidden" id="pin-modal">
-  <div class="modal-card">
-    <h3>🔒 Manager PIN</h3>
-    <p>Enter your PIN to edit prep times.</p>
-    <input type="password" id="pin-input" maxlength="8" placeholder="••••"
-      oninput="this.value=this.value.replace(/[^0-9]/g,'')"
-      onkeydown="if(event.key==='Enter')checkPin()" />
-    <div class="modal-error" id="pin-error"></div>
-    <div class="modal-btns">
-      <button class="btn-cancel" onclick="closePinModal()">Cancel</button>
-      <button class="btn-confirm" onclick="checkPin()">Unlock</button>
-    </div>
-  </div>
-</div>
 
 <!-- LOADING -->
 <div class="loading-overlay hidden" id="loading">
@@ -365,23 +350,8 @@
       </div>
     </div>
 
-    <div class="settings-card">
-      <h3>Manager PIN</h3>
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Protects recipe amounts, daily minimums, build-to quantities, and prep times from staff edits.</p>
-      <div class="settings-field">
-        <label>PIN (numbers only)</label>
-        <input id="set-pin" type="password" maxlength="8" placeholder="e.g. 1234"
-          oninput="this.value=this.value.replace(/[^0-9]/g,'')" onchange="savePin()" />
-      </div>
-      <div style="font-size:11px;color:var(--text-muted);">Leave blank to disable PIN protection. Default: 1234</div>
-    </div>
-
     <div class="settings-card" style="grid-column:1/-1;">
       <h3>Prep Items <span style="font-size:11px;font-weight:400;color:var(--text-muted)">— shared across all locations &nbsp;|&nbsp; Recipe Amt / Daily Min / Build To are per-location</span></h3>
-      <div id="pin-locked-banner" class="pin-locked-note" style="display:none;">
-        🔒 Prep Time is PIN-protected. Unlock to edit.
-        <button class="btn-small" style="margin-left:auto;" onclick="promptPin()">Unlock</button>
-      </div>
       <div class="section-tabs" id="settings-section-tabs"></div>
       <div style="overflow-x:auto;">
         <table class="items-table">
@@ -390,7 +360,7 @@
               <th style="width:22px;"></th>
               <th style="min-width:180px;">Item Name</th>
               <th style="width:80px;">Shelf Life</th>
-              <th style="width:90px;">Prep Time (min) 🔒</th>
+              <th style="width:90px;">Prep Time (min)</th>
               <th style="width:100px;">Recipe Amt</th>
               <th style="width:100px;">Daily Min</th>
               <th style="width:100px;">Build To</th>
@@ -437,8 +407,6 @@ let prepItems = [], staff = [], assignments = {}, currentDate = '';
 let schedHours = null, fixedBoh = 0;
 let saveDebounce = null, schedHoursDebounce = null;
 let settingsSectionIdx = 0;
-let pinUnlocked = false;
-let managerPin = '1234';
 let laborData = [];
 
 // ============================================================
@@ -487,44 +455,6 @@ function reconfigure() {
 }
 
 // ============================================================
-// PIN
-// ============================================================
-function promptPin() {
-  document.getElementById('pin-modal').classList.remove('hidden');
-  document.getElementById('pin-input').value = '';
-  document.getElementById('pin-error').textContent = '';
-  setTimeout(() => document.getElementById('pin-input').focus(), 80);
-}
-
-function closePinModal() {
-  document.getElementById('pin-modal').classList.add('hidden');
-}
-
-function checkPin() {
-  const entered = document.getElementById('pin-input').value;
-  if (!managerPin || entered === managerPin) {
-    pinUnlocked = true;
-    document.getElementById('pin-modal').classList.add('hidden');
-    renderSettingsItems(settingsSectionIdx);
-    updatePinBanner();
-    showToast('🔓 Fields unlocked for this session');
-  } else {
-    document.getElementById('pin-error').textContent = 'Incorrect PIN — try again.';
-    document.getElementById('pin-input').value = '';
-    document.getElementById('pin-input').focus();
-  }
-}
-
-function updatePinBanner() {
-  const b = document.getElementById('pin-locked-banner');
-  if (b) b.style.display = (managerPin && !pinUnlocked) ? 'flex' : 'none';
-}
-
-function savePin() {
-  managerPin = document.getElementById('set-pin').value;
-  saveSettingKey('manager_pin', managerPin);
-  showToast('PIN saved');
-}
 
 // ============================================================
 // INIT
@@ -669,12 +599,7 @@ async function loadSettings() {
         document.getElementById('fixed-boh').value = fixedBoh || '';
         document.getElementById('set-fixed-boh').value = fixedBoh || '';
       }
-      if (row.key === 'manager_pin') {
-        managerPin = row.value != null ? row.value : '1234';
-        document.getElementById('set-pin').value = managerPin;
-      }
     });
-    updatePinBanner();
   } catch(e) { console.error('loadSettings', e); }
 }
 
@@ -1240,16 +1165,13 @@ function renderSettingsItems(idx) {
   const items = prepItems.filter(i => i.section === sec.name);
   const tbody = document.getElementById('items-tbody');
   if (!tbody) return;
-  const locked = managerPin && !pinUnlocked;
-  updatePinBanner();
-
   // Update thead for portion dressings (no recipe_amt / build_to)
   const thead = document.getElementById('items-thead-row');
   if (thead) {
     if (isPortion) {
-      thead.innerHTML = `<th style="width:22px;"></th><th style="min-width:180px;">Item Name</th><th style="width:80px;">Shelf Life</th><th style="width:90px;">Prep Time (min) 🔒</th><th colspan="2" style="width:110px;">Daily Min 🔒</th><th style="width:32px;"></th>`;
+      thead.innerHTML = `<th style="width:22px;"></th><th style="min-width:180px;">Item Name</th><th style="width:80px;">Shelf Life</th><th style="width:90px;">Prep Time (min)</th><th colspan="2" style="width:110px;">Daily Min</th><th style="width:32px;"></th>`;
     } else {
-      thead.innerHTML = `<th style="width:22px;"></th><th style="min-width:180px;">Item Name</th><th style="width:80px;">Shelf Life</th><th style="width:90px;">Prep Time (min) 🔒</th><th style="width:100px;">Recipe Amt 🔒</th><th style="width:100px;">Daily Min 🔒</th><th style="width:100px;">Build To 🔒</th><th style="width:32px;"></th>`;
+      thead.innerHTML = `<th style="width:22px;"></th><th style="min-width:180px;">Item Name</th><th style="width:80px;">Shelf Life</th><th style="width:90px;">Prep Time (min)</th><th style="width:100px;">Recipe Amt</th><th style="width:100px;">Daily Min</th><th style="width:100px;">Build To</th><th style="width:32px;"></th>`;
     }
   }
 
@@ -1268,7 +1190,7 @@ function renderSettingsItems(idx) {
       <td><span class="drag-handle">⠿</span></td>
       <td><input type="text" value="${escHtml(item.name)}" onchange="updateItemField(${item.id},'name',this.value)" style="width:100%;" /></td>
       <td><input type="text" value="${escHtml(item.shelf_life||'')}" onchange="updateItemField(${item.id},'shelf_life',this.value)" style="width:75px;" /></td>
-      <td><input type="number" min="0" value="${item.prep_time||0}" ${locked?'disabled':''} onchange="updateItemField(${item.id},'prep_time',this.value)" style="width:70px;" /></td>
+      <td><input type="number" min="0" value="${item.prep_time||0}" onchange="updateItemField(${item.id},'prep_time',this.value)" style="width:70px;" /></td>
       ${recipeTd}
       <td><input type="text" value="${escHtml(item.daily_min||'')}" placeholder="e.g. 4 qt" onchange="updateOverride(${item.id},'daily_min',this.value)" style="width:90px;" /></td>
       ${buildTd}
@@ -1525,7 +1447,7 @@ function switchTab(name, btn) {
   document.getElementById('tab-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
   if (name === 'labor') { showLoading(true); loadLaborData().then(() => { renderLaborTab(); showLoading(false); }); }
-  if (name === 'settings') { updatePinBanner(); renderStaffList(); }
+  if (name === 'settings') { renderStaffList(); }
 }
 
 function showLoading(show) { document.getElementById('loading').classList.toggle('hidden', !show); }
