@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radish Kitchen — Prep Manager</title>
+<style>
+  :root {
+    --bg: #f5f3ef;
+    --card: #ffffff;
+    --border: #e0dbd2;
+    --text: #2c2825;
+    --text-muted: #7a7570;
+    --accent: #4a7c59;
+    --accent-light: #e8f2ec;
+    --green: #2e7d52;
+    --green-light: #e8f5ee;
+    --yellow: #e8a020;
+    --yellow-light: #fef7e8;
+    --red: #c8502a;
+    --red-light: #f5ede9;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08);
+    --radius: 8px;
+    --font: 'Georgia', serif;
+    --font-ui: 'Trebuchet MS', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 14px; }
+
+  /* SETUP SCREEN */
+  #setup-screen { display:none; position:fixed; inset:0; background:var(--bg); z-index:1000; overflow-y:auto; }
+  #setup-screen.active { display:flex; align-items:center; justify-content:center; }
+  .setup-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:40px; max-width:480px; width:90%; box-shadow:0 4px 20px rgba(0,0,0,0.1); }
+  .setup-card h1 { font-family:var(--font); font-size:24px; margin-bottom:6px; color:var(--accent); }
+  .setup-card p { color:var(--text-muted); margin-bottom:24px; font-size:13px; }
+  .setup-field { margin-bottom:16px; }
+  .setup-field label { display:block; font-weight:600; margin-bottom:6px; font-size:13px; }
+  .setup-field input, .setup-field select { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:var(--font-ui); background:var(--card); }
+  .setup-field input:focus, .setup-field select:focus { outline:none; border-color:var(--accent); }
+  .btn-primary { background:var(--accent); color:#fff; border:none; padding:12px 24px; border-radius:var(--radius); font-size:14px; font-weight:600; cursor:pointer; width:100%; margin-top:8px; }
+  .btn-primary:hover { background:#3a6347; }
+
+  /* HEADER */
+  header { background:var(--card); border-bottom:3px solid var(--accent); padding:0 16px; display:flex; align-items:center; gap:12px; height:56px; position:sticky; top:0; z-index:100; }
+  .header-logo { font-family:var(--font); font-size:18px; font-weight:bold; color:var(--accent); white-space:nowrap; }
+  .header-location { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; background:var(--accent-light); color:var(--accent); padding:3px 8px; border-radius:10px; }
+  nav { display:flex; gap:2px; margin-left:auto; flex-wrap:wrap; }
+  nav button { background:none; border:none; padding:7px 11px; border-radius:6px; cursor:pointer; font-size:12px; font-family:var(--font-ui); color:var(--text-muted); font-weight:600; transition:all .15s; white-space:nowrap; }
+  nav button.active { background:var(--accent-light); color:var(--accent); }
+  nav button:hover:not(.active) { background:var(--bg); }
+
+  /* TABS */
+  .tab { display:none; padding:20px; max-width:1200px; margin:0 auto; }
+  .tab.active { display:block; }
+
+  /* SUMMARY BAR */
+  .summary-bar { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:14px 20px; margin-bottom:16px; display:flex; gap:24px; flex-wrap:wrap; align-items:center; }
+  .summary-item { text-align:center; }
+  .summary-item .val { font-size:22px; font-weight:700; font-family:var(--font); color:var(--text); line-height:1; }
+  .summary-item .lbl { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }
+  .summary-item.over .val { color:var(--red); }
+  .summary-item.under .val { color:var(--green); }
+  .summary-divider { width:1px; height:36px; background:var(--border); }
+
+  /* DATE ROW */
+  .date-row { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+  .date-row select, .date-row input { padding:8px 12px; border:1px solid var(--border); border-radius:var(--radius); font-size:13px; font-family:var(--font-ui); background:var(--card); }
+  .date-row input[type=number] { width:90px; }
+  .date-row label { font-size:12px; color:var(--text-muted); font-weight:600; }
+  .date-row .spacer { flex:1; }
+
+  /* GROUP HEADERS (BOH / FOH) */
+  .group-header { background:var(--accent); color:#fff; padding:10px 20px; font-family:var(--font); font-size:15px; font-weight:bold; letter-spacing:.03em; margin-top:18px; display:flex; align-items:center; gap:10px; }
+
+  /* SECTION BLOCKS */
+  .section-block { background:var(--card); border:1px solid var(--border); border-bottom:none; overflow:hidden; }
+  .section-block:last-child { border-bottom:1px solid var(--border); border-radius:0 0 var(--radius) var(--radius); margin-bottom:4px; }
+  .section-header { background:#3a4a3f; color:#fff; padding:8px 16px; font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; display:flex; align-items:center; gap:8px; }
+  .section-header .sec-count { font-size:10px; background:rgba(255,255,255,.2); padding:2px 7px; border-radius:10px; font-weight:400; }
+
+  /* PREP TABLE */
+  .prep-table { width:100%; border-collapse:collapse; }
+  .prep-table th { padding:6px 7px; text-align:left; font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid var(--border); font-weight:700; background:var(--bg); white-space:nowrap; }
+  .prep-table td { padding:5px 7px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .prep-table tr:last-child td { border-bottom:none; }
+  .prep-table tr:hover td { background:#faf9f7; }
+  .item-name { font-size:13px; font-weight:600; }
+  .item-sublabel { font-size:11px; color:var(--text-muted); }
+  .item-time { font-size:11px; color:var(--text-muted); }
+  .item-time.active { color:var(--accent); font-weight:600; }
+
+  /* FIELD INPUTS */
+  input.qty-input { width:56px; padding:4px 5px; border:1px solid var(--border); border-radius:4px; font-size:12px; text-align:center; font-family:var(--font-ui); }
+  input.qty-input:focus { outline:none; border-color:var(--accent); }
+  input.on-hand-input { width:60px; padding:4px 5px; border:1px solid #f0d898; border-radius:4px; font-size:12px; text-align:center; font-family:var(--font-ui); background:#fffbf0; }
+  input.on-hand-input:focus { outline:none; border-color:var(--yellow); }
+  select.assign-select { padding:4px 5px; border:1px solid var(--border); border-radius:4px; font-size:11px; font-family:var(--font-ui); min-width:78px; background:var(--card); }
+  select.assign-select:focus { outline:none; border-color:var(--accent); }
+  input.notes-input { width:120px; padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:11px; font-family:var(--font-ui); }
+  input.notes-input:focus { outline:none; border-color:var(--accent); }
+
+  /* LOCKED STATIC VALUES */
+  .locked-val { font-size:12px; color:var(--text-muted); min-width:50px; display:inline-block; }
+
+  /* SAVE BUTTON */
+  .save-row { display:flex; gap:10px; margin-top:14px; align-items:center; }
+  .btn-save { background:var(--green); color:#fff; border:none; padding:10px 22px; border-radius:var(--radius); font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-save:hover { background:#256644; }
+  .btn-save:disabled { background:#aaa; cursor:default; }
+  .save-status { font-size:12px; color:var(--text-muted); }
+  .save-status.saving { color:var(--yellow); }
+  .save-status.saved { color:var(--green); }
+  .save-status.error { color:var(--red); }
+
+  /* ARCHIVE */
+  .archive-list { display:flex; flex-direction:column; gap:10px; }
+  .archive-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .archive-card-header { padding:12px 16px; cursor:pointer; display:flex; align-items:center; gap:12px; }
+  .archive-card-header:hover { background:var(--bg); }
+  .archive-date { font-weight:700; font-family:var(--font); }
+  .archive-meta { font-size:12px; color:var(--text-muted); }
+  .archive-badge { font-size:11px; padding:3px 8px; border-radius:10px; margin-left:auto; font-weight:600; }
+  .badge-saved { background:var(--green-light); color:var(--green); }
+  .badge-draft { background:var(--yellow-light); color:var(--yellow); }
+  .archive-detail { display:none; padding:14px 16px; border-top:1px solid var(--border); background:var(--bg); }
+  .archive-detail.open { display:block; }
+
+  /* SETTINGS */
+  .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:680px) { .settings-grid { grid-template-columns:1fr; } }
+  .settings-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:16px; }
+  .settings-card h3 { font-size:14px; font-weight:700; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  .staff-list { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+  .staff-item { display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--bg); border-radius:5px; }
+  .staff-item span { flex:1; font-size:13px; }
+  .btn-small { padding:4px 10px; border-radius:5px; font-size:12px; font-weight:600; cursor:pointer; border:1px solid var(--border); background:var(--card); }
+  .btn-small.danger { color:var(--red); border-color:var(--red); }
+  .btn-small.danger:hover { background:var(--red-light); }
+  .add-row { display:flex; gap:8px; }
+  .add-row input { flex:1; padding:7px 10px; border:1px solid var(--border); border-radius:5px; font-size:13px; font-family:var(--font-ui); }
+  .add-row input:focus { outline:none; border-color:var(--accent); }
+  .btn-add { background:var(--accent); color:#fff; border:none; padding:7px 14px; border-radius:5px; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .section-tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .section-tab { padding:5px 12px; border:1px solid var(--border); border-radius:20px; font-size:12px; cursor:pointer; background:var(--card); color:var(--text-muted); font-family:var(--font-ui); }
+  .section-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .items-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .items-table th { padding:6px 8px; text-align:left; font-size:11px; color:var(--text-muted); text-transform:uppercase; border-bottom:1px solid var(--border); white-space:nowrap; }
+  .items-table td { padding:6px 8px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .items-table tr:last-child td { border-bottom:none; }
+  .items-table input { padding:4px 6px; border:1px solid var(--border); border-radius:4px; font-size:12px; font-family:var(--font-ui); }
+  .items-table input[type=number] { width:70px; }
+  .items-table input[type=text] { width:100%; }
+  .items-table input:disabled { background:var(--bg); color:var(--text-muted); border-color:transparent; cursor:default; }
+  .drag-handle { cursor:grab; color:var(--text-muted); font-size:16px; padding:0 4px; user-select:none; }
+  .dragging { opacity:.4; }
+  .drag-over { border-top:2px solid var(--accent); }
+  .btn-icon { background:none; border:none; cursor:pointer; font-size:15px; padding:2px 5px; border-radius:4px; }
+  .btn-icon:hover { background:var(--accent-light); }
+  .pin-locked-note { font-size:12px; color:#7a5800; background:var(--yellow-light); border:1px solid #fde68a; border-radius:5px; padding:8px 12px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+  .settings-field { margin-bottom:12px; }
+  .settings-field label { display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:.04em; }
+  .settings-field input, .settings-field select { width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:5px; font-size:13px; font-family:var(--font-ui); background:var(--card); }
+  .settings-field input:focus { outline:none; border-color:var(--accent); }
+  .btn-outline { background:none; border:1px solid var(--accent); color:var(--accent); padding:8px 16px; border-radius:var(--radius); font-size:13px; font-weight:600; cursor:pointer; }
+  .btn-outline:hover { background:var(--accent-light); }
+  .add-item-form { background:var(--bg); border-top:1px solid var(--border); padding:10px; display:none; gap:6px; flex-wrap:wrap; align-items:flex-end; }
+  .add-item-form.open { display:flex; }
+  .add-item-form input, .add-item-form select { padding:6px 8px; border:1px solid var(--border); border-radius:5px; font-size:12px; font-family:var(--font-ui); }
+  .add-item-form input[type=text] { flex:1; min-width:120px; }
+  .add-item-form input[type=number] { width:70px; }
+  .empty-state { padding:30px; text-align:center; color:var(--text-muted); font-size:13px; }
+
+  /* PIN MODAL */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:600; display:flex; align-items:center; justify-content:center; }
+  .modal-overlay.hidden { display:none; }
+  .modal-card { background:var(--card); border-radius:12px; padding:32px; max-width:320px; width:90%; box-shadow:0 8px 32px rgba(0,0,0,.2); }
+  .modal-card h3 { font-family:var(--font); font-size:18px; margin-bottom:6px; color:var(--accent); }
+  .modal-card p { font-size:13px; color:var(--text-muted); margin-bottom:16px; }
+  .modal-card input { width:100%; padding:10px; border:1px solid var(--border); border-radius:var(--radius); font-size:22px; text-align:center; letter-spacing:.3em; margin-bottom:10px; font-family:monospace; }
+  .modal-card input:focus { outline:none; border-color:var(--accent); }
+  .modal-error { color:var(--red); font-size:12px; text-align:center; min-height:16px; margin-bottom:8px; }
+  .modal-btns { display:flex; gap:8px; }
+  .modal-btns button { flex:1; padding:10px; border-radius:var(--radius); font-size:13px; font-weight:600; cursor:pointer; border:none; }
+  .btn-cancel { background:var(--bg); color:var(--text); border:1px solid var(--border) !important; }
+  .btn-confirm { background:var(--accent); color:#fff; }
+
+  /* LABOR */
+  .labor-table { width:100%; border-collapse:collapse; font-size:13px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .labor-table th { padding:9px 14px; text-align:left; font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; border-bottom:2px solid var(--border); background:var(--bg); font-weight:700; }
+  .labor-table td { padding:8px 14px; border-bottom:1px solid var(--border); }
+  .labor-table tr:last-child td { border-bottom:none; }
+  .labor-table td.over { color:var(--red); font-weight:700; }
+  .labor-table td.under { color:var(--green); font-weight:700; }
+  .labor-summary-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:12px 18px; text-align:center; min-width:110px; }
+  .labor-summary-card .val { font-size:22px; font-weight:700; font-family:var(--font); line-height:1; }
+  .labor-summary-card .lbl { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-top:3px; }
+
+  /* MISC */
+  .loading-overlay { position:fixed; inset:0; background:rgba(245,243,239,.85); z-index:500; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; }
+  .loading-overlay.hidden { display:none; }
+  .spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .toast { position:fixed; bottom:20px; right:20px; background:var(--text); color:#fff; padding:10px 18px; border-radius:var(--radius); font-size:13px; z-index:999; opacity:0; transition:opacity .3s; pointer-events:none; }
+  .toast.show { opacity:1; }
+
+  /* PRINT */
+  @media print {
+    header, nav, .date-row, .save-row, .summary-bar,
+    #tab-archive, #tab-settings, #tab-labor, .no-print { display:none !important; }
+    body { background:#fff; font-size:11px; }
+    .tab { display:block !important; padding:4px; max-width:100%; }
+    .print-page-boh { page-break-after: always; }
+    .group-header { background:#333 !important; color:#fff !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; margin-top:0 !important; }
+    .section-block { border:1px solid #ccc; page-break-inside:avoid; }
+    .section-header { background:#555 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    input, select { border:none !important; background:transparent !important; font-size:11px !important; }
+    .locked-val { font-size:11px; }
+    .print-header { display:block !important; margin-bottom:8px; }
+  }
+  .print-header { display:none; }
+  .print-header h2 { font-family:var(--font); font-size:18px; }
+  .print-header p { font-size:12px; color:#555; margin-top:3px; }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h1>🌿 Radish Kitchen</h1>
+    <p>Select your location and enter your Supabase credentials to connect.</p>
+    <div class="setup-field">
+      <label>Location</label>
+      <select id="setup-location">
+        <option value="">— Select Location —</option>
+        <option value="Sylvan">Sylvan</option>
+        <option value="Cool Springs">Cool Springs</option>
+        <option value="East">East</option>
+        <option value="Assembly">Assembly</option>
+      </select>
+    </div>
+    <div class="setup-field"><label>Supabase Project URL</label><input id="setup-url" type="text" placeholder="https://xxxx.supabase.co" /></div>
+    <div class="setup-field"><label>Supabase Anon Key</label><input id="setup-key" type="text" /></div>
+    <button class="btn-primary" onclick="saveSetup()">Save &amp; Continue</button>
+  </div>
+</div>
+
+<!-- PIN MODAL -->
+<div class="modal-overlay hidden" id="pin-modal">
+  <div class="modal-card">
+    <h3>🔒 Manager PIN</h3>
+    <p>Enter your PIN to edit recipe amounts, daily minimums, build-to quantities, and prep times.</p>
+    <input type="password" id="pin-input" maxlength="8" placeholder="••••"
+      oninput="this.value=this.value.replace(/[^0-9]/g,'')"
+      onkeydown="if(event.key==='Enter')checkPin()" />
+    <div class="modal-error" id="pin-error"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closePinModal()">Cancel</button>
+      <button class="btn-confirm" onclick="checkPin()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading-overlay hidden" id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:13px;color:var(--text-muted)">Loading...</div>
+</div>
+<div class="toast" id="toast"></div>
+
+<!-- HEADER -->
+<header>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="header-logo">🌿 Radish Kitchen</div>
+    <div class="header-location" id="header-location"></div>
+  </div>
+  <nav>
+    <button class="active" onclick="switchTab('prep',this)">Prep List</button>
+    <button onclick="switchTab('labor',this)">Labor Data</button>
+    <button onclick="switchTab('archive',this)">Archive</button>
+    <button onclick="switchTab('settings',this)">Settings</button>
+    <button onclick="window.print()" class="no-print" style="color:var(--text-muted)">🖨</button>
+  </nav>
+</header>
+
+<!-- PREP TAB -->
+<div class="tab active" id="tab-prep">
+  <div class="print-header">
+    <h2 id="print-location-name"></h2>
+    <p id="print-date-line"></p>
+  </div>
+  <div class="no-print">
+    <div class="date-row">
+      <label>Date:</label>
+      <select id="date-select" onchange="onDateChange()"></select>
+      <label>Scheduled Hours:</label>
+      <input type="number" id="sched-hours" min="0" max="99" step="0.5" placeholder="hrs" onchange="saveSchedHours()" oninput="saveSchedHours()" />
+      <label>Fixed BOH (min):</label>
+      <input type="number" id="fixed-boh" min="0" max="999" step="5" placeholder="min" onchange="saveFixedBoh()" />
+      <div class="spacer"></div>
+      <button class="btn-save" id="save-btn" onclick="saveDay()">💾 Save This List</button>
+      <span class="save-status" id="save-status"></span>
+    </div>
+  </div>
+  <div class="summary-bar no-print">
+    <div class="summary-item"><div class="val" id="sum-items">0</div><div class="lbl">Items w/ Qty</div></div>
+    <div class="summary-divider"></div>
+    <div class="summary-item"><div class="val" id="sum-assigned">0</div><div class="lbl">Assigned</div></div>
+    <div class="summary-divider"></div>
+    <div class="summary-item"><div class="val" id="sum-hours">0</div><div class="lbl">Est. Hours</div></div>
+    <div class="summary-divider"></div>
+    <div class="summary-item"><div class="val" id="sum-sched">—</div><div class="lbl">Sched. Hours</div></div>
+    <div class="summary-divider"></div>
+    <div class="summary-item" id="sum-delta-wrap"><div class="val" id="sum-delta">—</div><div class="lbl">Over/Under</div></div>
+  </div>
+  <div id="sections-container"></div>
+</div>
+
+<!-- LABOR TAB -->
+<div class="tab" id="tab-labor">
+  <h2 style="font-family:var(--font);margin-bottom:4px;">Labor Data</h2>
+  <p style="font-size:12px;color:var(--text-muted);margin-bottom:20px;">Past 30 days — <span id="labor-location-label"></span></p>
+  <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+    <div id="labor-summary-cards" style="display:flex;gap:12px;flex-wrap:wrap;flex:1;"></div>
+    <button class="btn-outline" onclick="downloadLaborCSV()" style="white-space:nowrap;">⬇ Download CSV</button>
+  </div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;">
+    <canvas id="labor-chart" height="120"></canvas>
+  </div>
+  <table class="labor-table">
+    <thead><tr><th>Date</th><th>Est. Hours</th><th>Sched. Hours</th><th>% Utilized</th><th>Over/Under</th></tr></thead>
+    <tbody id="labor-tbody"></tbody>
+  </table>
+</div>
+
+<!-- ARCHIVE TAB -->
+<div class="tab" id="tab-archive">
+  <h2 style="font-family:var(--font);margin-bottom:16px;">Archive</h2>
+  <div class="archive-list" id="archive-list"></div>
+</div>
+
+<!-- SETTINGS TAB -->
+<div class="tab" id="tab-settings">
+  <h2 style="font-family:var(--font);margin-bottom:16px;">Settings</h2>
+  <div class="settings-grid">
+
+    <div class="settings-card">
+      <h3>Location</h3>
+      <div class="settings-field">
+        <label>Current Location</label>
+        <input id="set-location-display" type="text" disabled style="background:var(--bg);color:var(--text-muted);" />
+      </div>
+      <div class="settings-field">
+        <label>Fixed BOH Time (minutes)</label>
+        <input id="set-fixed-boh" type="number" min="0" step="5" onchange="saveFixedBohSettings()" />
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;">Added to daily estimated total.</div>
+      </div>
+      <button class="btn-outline" style="margin-top:6px;" onclick="reconfigure()">Change Location / Reconfigure</button>
+    </div>
+
+    <div class="settings-card">
+      <h3>Staff Roster <span style="font-size:11px;font-weight:400;color:var(--text-muted)">— this location only</span></h3>
+      <div class="staff-list" id="staff-list"></div>
+      <div class="add-row">
+        <input id="new-staff-name" type="text" placeholder="Staff name" onkeydown="if(event.key==='Enter')addStaff()" />
+        <button class="btn-add" onclick="addStaff()">+ Add</button>
+      </div>
+    </div>
+
+    <div class="settings-card">
+      <h3>Manager PIN</h3>
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">Protects recipe amounts, daily minimums, build-to quantities, and prep times from staff edits.</p>
+      <div class="settings-field">
+        <label>PIN (numbers only)</label>
+        <input id="set-pin" type="password" maxlength="8" placeholder="e.g. 1234"
+          oninput="this.value=this.value.replace(/[^0-9]/g,'')" onchange="savePin()" />
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);">Leave blank to disable PIN protection. Default: 1234</div>
+    </div>
+
+    <div class="settings-card" style="grid-column:1/-1;">
+      <h3>Prep Items <span style="font-size:11px;font-weight:400;color:var(--text-muted)">— shared across all locations &nbsp;|&nbsp; Recipe Amt / Daily Min / Build To are per-location</span></h3>
+      <div id="pin-locked-banner" class="pin-locked-note" style="display:none;">
+        🔒 Recipe Amt, Daily Min, Build To, and Prep Time are PIN-protected.
+        <button class="btn-small" style="margin-left:auto;" onclick="promptPin()">Unlock</button>
+      </div>
+      <div class="section-tabs" id="settings-section-tabs"></div>
+      <div style="overflow-x:auto;">
+        <table class="items-table">
+          <thead>
+            <tr id="items-thead-row">
+              <th style="width:22px;"></th>
+              <th style="min-width:180px;">Item Name</th>
+              <th style="width:80px;">Shelf Life</th>
+              <th style="width:90px;">Prep Time (min) 🔒</th>
+              <th style="width:100px;">Recipe Amt 🔒</th>
+              <th style="width:100px;">Daily Min 🔒</th>
+              <th style="width:100px;">Build To 🔒</th>
+              <th style="width:32px;"></th>
+            </tr>
+          </thead>
+          <tbody id="items-tbody"></tbody>
+        </table>
+      </div>
+      <div class="add-item-form" id="add-item-form">
+        <input type="text" id="new-item-name" placeholder="Item name" />
+        <select id="new-item-section"><option value="">Section...</option></select>
+        <input type="number" id="new-item-mins" placeholder="Prep mins" min="0" />
+        <button class="btn-add" onclick="addItem()">+ Add Item</button>
+        <button class="btn-small" onclick="toggleAddForm()">Cancel</button>
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn-outline" onclick="toggleAddForm()">+ New Item</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG & STATE
+// ============================================================
+const SECTIONS = [
+  { name:'Hot Prep',           group:'BOH', isPortion:false },
+  { name:'Cold Prep',          group:'BOH', isPortion:false },
+  { name:'Produce Prep',       group:'BOH', isPortion:false },
+  { name:'Protein Prep',       group:'BOH', isPortion:false },
+  { name:'Toasting/Spice Mix', group:'BOH', isPortion:false },
+  { name:'Line Prep',          group:'FOH', isPortion:false },
+  { name:'Backups',            group:'FOH', isPortion:false },
+  { name:'Portion Dressings',  group:'FOH', isPortion:true  },
+];
+
+let SUPA_URL = '', SUPA_KEY = '', LOCATION_NAME = '', LOCATION_ID = null;
+let prepItems = [], staff = [], assignments = {}, currentDate = '';
+let schedHours = null, fixedBoh = 0;
+let saveDebounce = null, schedHoursDebounce = null;
+let settingsSectionIdx = 0;
+let pinUnlocked = false;
+let managerPin = '1234';
+let laborData = [];
+
+// ============================================================
+// SUPABASE HELPER
+// ============================================================
+function supa(path, opts = {}) {
+  const headers = {
+    'apikey': SUPA_KEY,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Content-Type': 'application/json',
+    ...(opts.headers || {}),
+  };
+  if (opts.prefer) headers['Prefer'] = opts.prefer;
+  return fetch(SUPA_URL + '/rest/v1/' + path, { ...opts, headers });
+}
+
+// ============================================================
+// SETUP
+// ============================================================
+function checkSetup() {
+  const url = localStorage.getItem('rk_supa_url');
+  const key = localStorage.getItem('rk_supa_key');
+  const loc = localStorage.getItem('rk_location');
+  if (!url || !key || !loc) {
+    document.getElementById('setup-screen').classList.add('active');
+    return false;
+  }
+  SUPA_URL = url; SUPA_KEY = key; LOCATION_NAME = loc;
+  document.getElementById('header-location').textContent = loc;
+  document.getElementById('print-location-name').textContent = 'Radish Kitchen — ' + loc;
+  document.getElementById('set-location-display').value = loc;
+  document.getElementById('labor-location-label').textContent = loc;
+  return true;
+}
+
+function saveSetup() {
+  const loc = document.getElementById('setup-location').value;
+  const url = document.getElementById('setup-url').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('setup-key').value.trim();
+  if (!loc) { alert('Please select a location.'); return; }
+  if (!url || !key) { alert('Please enter Supabase credentials.'); return; }
+  localStorage.setItem('rk_supa_url', url);
+  localStorage.setItem('rk_supa_key', key);
+  localStorage.setItem('rk_location', loc);
+  location.reload();
+}
+
+function reconfigure() {
+  if (confirm('Change location or re-enter Supabase credentials? You will need to re-select your location.')) {
+    localStorage.removeItem('rk_supa_url');
+    localStorage.removeItem('rk_supa_key');
+    localStorage.removeItem('rk_location');
+    location.reload();
+  }
+}
+
+// ============================================================
+// PIN
+// ============================================================
+function promptPin() {
+  document.getElementById('pin-modal').classList.remove('hidden');
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-error').textContent = '';
+  setTimeout(() => document.getElementById('pin-input').focus(), 80);
+}
+
+function closePinModal() {
+  document.getElementById('pin-modal').classList.add('hidden');
+}
+
+function checkPin() {
+  const entered = document.getElementById('pin-input').value;
+  if (!managerPin || entered === managerPin) {
+    pinUnlocked = true;
+    document.getElementById('pin-modal').classList.add('hidden');
+    renderSettingsItems(settingsSectionIdx);
+    updatePinBanner();
+    showToast('🔓 Fields unlocked for this session');
+  } else {
+    document.getElementById('pin-error').textContent = 'Incorrect PIN — try again.';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+  }
+}
+
+function updatePinBanner() {
+  const b = document.getElementById('pin-locked-banner');
+  if (b) b.style.display = (managerPin && !pinUnlocked) ? 'flex' : 'none';
+}
+
+function savePin() {
+  managerPin = document.getElementById('set-pin').value;
+  saveSettingKey('manager_pin', managerPin);
+  showToast('PIN saved');
+}
+
+// ============================================================
+// INIT
+// ============================================================
+async function init() {
+  if (!checkSetup()) return;
+  showLoading(true);
+  try {
+    await ensureSchema();
+    await loadLocation();
+    await Promise.all([loadStaff(), loadPrepItems(), loadSettings()]);
+    buildDateDropdown();
+    currentDate = document.getElementById('date-select').value;
+    await loadDayData(currentDate);
+    await loadArchive();
+  } catch(e) {
+    console.error(e);
+    showToast('Connection error — check Supabase credentials', 5000);
+  }
+  showLoading(false);
+}
+
+// ============================================================
+// SCHEMA CHECK
+// ============================================================
+async function ensureSchema() {
+  const r = await supa('rk_locations?limit=1');
+  if (!r.ok) {
+    const sql = `
+-- Run this SQL in your Supabase SQL Editor --
+
+CREATE TABLE rk_locations (
+  id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  name text UNIQUE NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE rk_locations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all" ON rk_locations FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE rk_settings (
+  id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  location_id bigint,
+  key text NOT NULL,
+  value text,
+  UNIQUE(location_id, key)
+);
+ALTER TABLE rk_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all" ON rk_settings FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE rk_staff (
+  id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  location_id bigint NOT NULL,
+  name text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE rk_staff ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all" ON rk_staff FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE rk_prep_items (
+  id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  name text NOT NULL,
+  section text NOT NULL,
+  shelf_life text,
+  prep_time int DEFAULT 0,
+  sort_order int DEFAULT 0,
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE rk_prep_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all" ON rk_prep_items FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE rk_item_overrides (
+  id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  location_id bigint NOT NULL,
+  item_id bigint NOT NULL,
+  recipe_amt text,
+  daily_min text,
+  build_to text,
+  UNIQUE(location_id, item_id)
+);
+ALTER TABLE rk_item_overrides ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all" ON rk_item_overrides FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE rk_prep_days (
+  id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  location_id bigint NOT NULL,
+  prep_date date NOT NULL,
+  scheduled_hours numeric,
+  saved_at timestamptz,
+  UNIQUE(location_id, prep_date)
+);
+ALTER TABLE rk_prep_days ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all" ON rk_prep_days FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE rk_assignments (
+  id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+  location_id bigint NOT NULL,
+  prep_date date NOT NULL,
+  item_id bigint NOT NULL,
+  on_hand text,
+  am_qty numeric,
+  am_assign text,
+  pm_qty numeric,
+  pm_assign text,
+  notes text,
+  UNIQUE(location_id, prep_date, item_id)
+);
+ALTER TABLE rk_assignments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all" ON rk_assignments FOR ALL USING (true) WITH CHECK (true);
+`;
+    console.log(sql);
+    alert('Database tables not found. Check the browser console for setup SQL to run in Supabase.');
+    throw new Error('Schema missing');
+  }
+}
+
+// ============================================================
+// LOCATION
+// ============================================================
+async function loadLocation() {
+  const r = await supa('rk_locations?name=eq.' + encodeURIComponent(LOCATION_NAME) + '&select=id');
+  const d = await r.json();
+  if (Array.isArray(d) && d.length > 0) {
+    LOCATION_ID = d[0].id;
+  } else {
+    const cr = await supa('rk_locations', { method:'POST', prefer:'return=representation', body: JSON.stringify({ name: LOCATION_NAME }) });
+    const cd = await cr.json();
+    LOCATION_ID = Array.isArray(cd) ? cd[0].id : cd.id;
+  }
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+async function loadSettings() {
+  try {
+    const r = await supa('rk_settings?location_id=eq.' + LOCATION_ID + '&select=key,value');
+    const d = await r.json();
+    if (!Array.isArray(d)) return;
+    d.forEach(row => {
+      if (row.key === 'fixed_boh') {
+        fixedBoh = parseFloat(row.value) || 0;
+        document.getElementById('fixed-boh').value = fixedBoh || '';
+        document.getElementById('set-fixed-boh').value = fixedBoh || '';
+      }
+      if (row.key === 'manager_pin') {
+        managerPin = row.value != null ? row.value : '1234';
+        document.getElementById('set-pin').value = managerPin;
+      }
+    });
+    updatePinBanner();
+  } catch(e) { console.error('loadSettings', e); }
+}
+
+async function saveSettingKey(key, value) {
+  await supa('rk_settings', {
+    method:'POST', prefer:'resolution=merge-duplicates',
+    body: JSON.stringify({ location_id: LOCATION_ID, key, value: String(value ?? '') })
+  });
+}
+
+function saveFixedBoh() {
+  fixedBoh = parseFloat(document.getElementById('fixed-boh').value) || 0;
+  document.getElementById('set-fixed-boh').value = fixedBoh || '';
+  if (schedHoursDebounce) clearTimeout(schedHoursDebounce);
+  schedHoursDebounce = setTimeout(() => saveSettingKey('fixed_boh', fixedBoh), 800);
+  updateSummary();
+}
+
+function saveFixedBohSettings() {
+  fixedBoh = parseFloat(document.getElementById('set-fixed-boh').value) || 0;
+  document.getElementById('fixed-boh').value = fixedBoh || '';
+  saveSettingKey('fixed_boh', fixedBoh);
+}
+
+// ============================================================
+// STAFF
+// ============================================================
+async function loadStaff() {
+  try {
+    const r = await supa('rk_staff?location_id=eq.' + LOCATION_ID + '&order=name&select=id,name');
+    const d = await r.json();
+    staff = Array.isArray(d) ? d : [];
+  } catch(e) { staff = []; }
+  renderStaffList();
+}
+
+function renderStaffList() {
+  const el = document.getElementById('staff-list');
+  if (!el) return;
+  el.innerHTML = staff.length === 0
+    ? '<div style="font-size:13px;color:var(--text-muted);padding:4px 0;">No staff added yet.</div>'
+    : staff.map(s => `<div class="staff-item"><span>${escHtml(s.name)}</span><button class="btn-small danger" onclick="removeStaff(${s.id})">Remove</button></div>`).join('');
+}
+
+async function addStaff() {
+  const name = document.getElementById('new-staff-name').value.trim();
+  if (!name) return;
+  const r = await supa('rk_staff', { method:'POST', prefer:'return=representation', body: JSON.stringify({ location_id: LOCATION_ID, name }) });
+  const d = await r.json();
+  staff.push(Array.isArray(d) ? d[0] : d);
+  staff.sort((a,b) => a.name.localeCompare(b.name));
+  document.getElementById('new-staff-name').value = '';
+  renderStaffList();
+  renderPrepList();
+}
+
+async function removeStaff(id) {
+  if (!confirm('Remove staff member?')) return;
+  await supa('rk_staff?id=eq.' + id, { method:'DELETE' });
+  staff = staff.filter(s => s.id !== id);
+  renderStaffList();
+  renderPrepList();
+}
+
+// ============================================================
+// PREP ITEMS
+// ============================================================
+async function loadPrepItems() {
+  try {
+    const r = await supa('rk_prep_items?order=sort_order,id&select=id,name,section,shelf_life,prep_time,sort_order');
+    const d = await r.json();
+    prepItems = Array.isArray(d) ? d : [];
+    if (prepItems.length === 0) await seedPrepItems();
+  } catch(e) { console.error('loadPrepItems', e); prepItems = []; }
+
+  // Load per-location overrides
+  try {
+    const r = await supa('rk_item_overrides?location_id=eq.' + LOCATION_ID + '&select=item_id,recipe_amt,daily_min,build_to');
+    const d = await r.json();
+    const ovMap = {};
+    if (Array.isArray(d)) d.forEach(o => { ovMap[o.item_id] = o; });
+    prepItems.forEach(item => {
+      const ov = ovMap[item.id] || {};
+      item.recipe_amt = ov.recipe_amt || '';
+      item.daily_min  = ov.daily_min  || '';
+      item.build_to   = ov.build_to   || '';
+    });
+  } catch(e) { console.error('loadOverrides', e); }
+
+  buildSettingsSectionTabs();
+  renderSettingsItems(settingsSectionIdx);
+  buildNewItemSectionDropdown();
+}
+
+async function seedPrepItems() {
+  const SEED = [
+    {name:'Simple Syrup',        section:'Hot Prep',           shelf_life:'7 days', prep_time:0, sort_order:1},
+    {name:'Iced Tea',            section:'Hot Prep',           shelf_life:'4 days', prep_time:0, sort_order:2},
+    {name:'Hummus',              section:'Hot Prep',           shelf_life:'7 days', prep_time:0, sort_order:3},
+    {name:'Hot Sauce',           section:'Hot Prep',           shelf_life:'7 days', prep_time:0, sort_order:4},
+    {name:'Salmon Glaze',        section:'Hot Prep',           shelf_life:'7 days', prep_time:0, sort_order:5},
+    {name:'FroYo',               section:'Hot Prep',           shelf_life:'7 days', prep_time:0, sort_order:6},
+    {name:'Magic Shell',         section:'Hot Prep',           shelf_life:'5 days', prep_time:0, sort_order:7},
+    {name:'Soup',                section:'Hot Prep',           shelf_life:'5 days', prep_time:0, sort_order:8},
+    {name:'Lentils',             section:'Hot Prep',           shelf_life:'4 days', prep_time:0, sort_order:9},
+    {name:'Pickled Onions',      section:'Hot Prep',           shelf_life:'7 days', prep_time:0, sort_order:10},
+    {name:'BBQ Sauce',           section:'Hot Prep',           shelf_life:'7 days', prep_time:0, sort_order:11},
+    {name:'Falafel',             section:'Cold Prep',          shelf_life:'4 days', prep_time:0, sort_order:1},
+    {name:'Cookie Dough',        section:'Cold Prep',          shelf_life:'5 days', prep_time:0, sort_order:2},
+    {name:'Sweet Marinade',      section:'Cold Prep',          shelf_life:'4 days', prep_time:0, sort_order:3},
+    {name:'Romesco',             section:'Cold Prep',          shelf_life:'7 days', prep_time:0, sort_order:4},
+    {name:'Blk Bn Slsa',         section:'Cold Prep',          shelf_life:'4 days', prep_time:0, sort_order:5},
+    {name:'Orange',              section:'Cold Prep',          shelf_life:'3 days', prep_time:0, sort_order:6},
+    {name:'Carrot',              section:'Cold Prep',          shelf_life:'4 days', prep_time:0, sort_order:7},
+    {name:'Tomatillo Lime',      section:'Cold Prep',          shelf_life:'4 days', prep_time:0, sort_order:8},
+    {name:'Jalapeno Ginger',     section:'Cold Prep',          shelf_life:'5 days', prep_time:0, sort_order:9},
+    {name:'Caesar',              section:'Cold Prep',          shelf_life:'7 days', prep_time:0, sort_order:10},
+    {name:'House',               section:'Cold Prep',          shelf_life:'7 days', prep_time:0, sort_order:11},
+    {name:'Ranch',               section:'Cold Prep',          shelf_life:'7 days', prep_time:0, sort_order:12},
+    {name:"Lemon Za'atar",       section:'Cold Prep',          shelf_life:'7 days', prep_time:0, sort_order:13},
+    {name:'Carrot Miso',         section:'Cold Prep',          shelf_life:'5 days', prep_time:0, sort_order:14},
+    {name:'Tahini Yogurt',       section:'Cold Prep',          shelf_life:'7 days', prep_time:0, sort_order:15},
+    {name:'Seasonal',            section:'Cold Prep',          shelf_life:'',       prep_time:0, sort_order:16},
+    {name:'Tomato',              section:'Produce Prep',       shelf_life:'3 days', prep_time:0, sort_order:1},
+    {name:'Cucumber',            section:'Produce Prep',       shelf_life:'3 days', prep_time:0, sort_order:2},
+    {name:'Lemon Zest',          section:'Produce Prep',       shelf_life:'5 days', prep_time:0, sort_order:3},
+    {name:'Minced Garlic',       section:'Produce Prep',       shelf_life:'6 days', prep_time:0, sort_order:4},
+    {name:'Parsley',             section:'Produce Prep',       shelf_life:'4 days', prep_time:0, sort_order:5},
+    {name:'Radish',              section:'Produce Prep',       shelf_life:'3 days', prep_time:0, sort_order:6},
+    {name:'Watermelon Rad',      section:'Produce Prep',       shelf_life:'3 days', prep_time:0, sort_order:7},
+    {name:'Napa',                section:'Produce Prep',       shelf_life:'2 days', prep_time:0, sort_order:8},
+    {name:'Avocado',             section:'Produce Prep',       shelf_life:'2 days', prep_time:0, sort_order:9},
+    {name:'Bake Cookies',        section:'Protein Prep',       shelf_life:'2 days', prep_time:0, sort_order:1},
+    {name:'Salmon',              section:'Protein Prep',       shelf_life:'4 days', prep_time:0, sort_order:2},
+    {name:'Chicken Thighs',      section:'Protein Prep',       shelf_life:'4 days', prep_time:0, sort_order:3},
+    {name:'Steak',               section:'Protein Prep',       shelf_life:'4 days', prep_time:0, sort_order:4},
+    {name:'Panko Chicken',       section:'Protein Prep',       shelf_life:'4 days', prep_time:0, sort_order:5},
+    {name:'Sweet Potato',        section:'Protein Prep',       shelf_life:'3 days', prep_time:0, sort_order:6},
+    {name:'Bacon',               section:'Protein Prep',       shelf_life:'5 days', prep_time:0, sort_order:7},
+    {name:'Grilled Corn',        section:'Protein Prep',       shelf_life:'4 days', prep_time:0, sort_order:8},
+    {name:'Pepitas',             section:'Toasting/Spice Mix', shelf_life:'2 weeks',prep_time:0, sort_order:1},
+    {name:'Panko',               section:'Toasting/Spice Mix', shelf_life:'2 weeks',prep_time:0, sort_order:2},
+    {name:'Walnuts',             section:'Toasting/Spice Mix', shelf_life:'2 weeks',prep_time:0, sort_order:3},
+    {name:'Chicken Rub',         section:'Toasting/Spice Mix', shelf_life:'1 month',prep_time:0, sort_order:4},
+    {name:'Lemonade',            section:'Line Prep',          shelf_life:'4 days', prep_time:0, sort_order:1},
+    {name:'Limeade',             section:'Line Prep',          shelf_life:'4 days', prep_time:0, sort_order:2},
+    {name:'Eggs',                section:'Line Prep',          shelf_life:'5 days', prep_time:0, sort_order:3},
+    {name:'Edamame',             section:'Line Prep',          shelf_life:'5 days', prep_time:0, sort_order:4},
+    {name:'Mint',                section:'Line Prep',          shelf_life:'2 days', prep_time:0, sort_order:5},
+    {name:'Limes',               section:'Line Prep',          shelf_life:'2 days', prep_time:0, sort_order:6},
+    {name:'Lemons',              section:'Line Prep',          shelf_life:'2 days', prep_time:0, sort_order:7},
+    {name:'Pita Chips',          section:'Line Prep',          shelf_life:'2 days', prep_time:0, sort_order:8},
+    {name:'Spring Mix',          section:'Backups',            shelf_life:'3 days', prep_time:0, sort_order:1},
+    {name:'Kale',                section:'Backups',            shelf_life:'3 days', prep_time:0, sort_order:2},
+    {name:'Crunchies',           section:'Backups',            shelf_life:'7 days', prep_time:0, sort_order:3},
+    {name:'Cheeses',             section:'Backups',            shelf_life:'7 days', prep_time:0, sort_order:4},
+    {name:'Tomatillo Lime (P)',  section:'Portion Dressings',  shelf_life:'5 days', prep_time:0, sort_order:1},
+    {name:'Jalapeno Ginger (P)', section:'Portion Dressings',  shelf_life:'5 days', prep_time:0, sort_order:2},
+    {name:'Caesar (P)',          section:'Portion Dressings',  shelf_life:'7 days', prep_time:0, sort_order:3},
+    {name:'House (P)',           section:'Portion Dressings',  shelf_life:'7 days', prep_time:0, sort_order:4},
+    {name:'Ranch (P)',           section:'Portion Dressings',  shelf_life:'7 days', prep_time:0, sort_order:5},
+    {name:"Lemon Za'atar (P)",   section:'Portion Dressings',  shelf_life:'7 days', prep_time:0, sort_order:6},
+    {name:'Carrot Miso (P)',     section:'Portion Dressings',  shelf_life:'5 days', prep_time:0, sort_order:7},
+    {name:'Tahini Yogurt (P)',   section:'Portion Dressings',  shelf_life:'7 days', prep_time:0, sort_order:8},
+    {name:'Seasonal (P)',        section:'Portion Dressings',  shelf_life:'5 days', prep_time:0, sort_order:9},
+    {name:'Olive Oil (P)',       section:'Portion Dressings',  shelf_life:'7 days', prep_time:0, sort_order:10},
+    {name:'Red Wine Vinegar (P)',section:'Portion Dressings',  shelf_life:'7 days', prep_time:0, sort_order:11},
+  ];
+  try {
+    const r = await supa('rk_prep_items', { method:'POST', prefer:'return=representation', body: JSON.stringify(SEED) });
+    const d = await r.json();
+    if (Array.isArray(d)) prepItems = d.map(i => ({ ...i, recipe_amt:'', daily_min:'', build_to:'' }));
+  } catch(e) { console.error('seedPrepItems', e); }
+}
+
+// ============================================================
+// DATE HELPERS
+// ============================================================
+function fmtDate(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function fmtDateDisplay(d) {
+  return d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+}
+function buildDateDropdown() {
+  const sel = document.getElementById('date-select');
+  sel.innerHTML = '';
+  const today = new Date();
+  for (let i = -1; i <= 13; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const val = fmtDate(d);
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = fmtDateDisplay(d) + (i === 0 ? ' (Today)' : i === -1 ? ' (Yesterday)' : '');
+    if (i === 0) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+// ============================================================
+// LOAD DAY DATA
+// ============================================================
+async function loadDayData(dateStr) {
+  assignments = {};
+  schedHours = null;
+  document.getElementById('sched-hours').value = '';
+  document.getElementById('save-status').textContent = '';
+  document.getElementById('print-date-line').textContent = fmtDateDisplay(new Date(dateStr + 'T12:00:00'));
+
+  try {
+    const r = await supa('rk_prep_days?location_id=eq.'+LOCATION_ID+'&prep_date=eq.'+dateStr+'&select=scheduled_hours,saved_at');
+    const d = await r.json();
+    if (Array.isArray(d) && d.length > 0) {
+      schedHours = d[0].scheduled_hours != null ? parseFloat(d[0].scheduled_hours) : null;
+      document.getElementById('sched-hours').value = schedHours != null ? schedHours : '';
+      if (d[0].saved_at) {
+        setStatus('saved', '✓ Saved ' + new Date(d[0].saved_at).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}));
+      }
+    }
+  } catch(e) { console.error('loadDayData prep_days', e); }
+
+  try {
+    const r = await supa('rk_assignments?location_id=eq.'+LOCATION_ID+'&prep_date=eq.'+dateStr+'&select=item_id,on_hand,am_qty,am_assign,pm_qty,pm_assign,notes');
+    const d = await r.json();
+    if (Array.isArray(d)) {
+      d.forEach(a => {
+        assignments[String(a.item_id)] = {
+          on_hand:   a.on_hand   || '',
+          am_qty:    a.am_qty    != null ? a.am_qty    : '',
+          am_assign: a.am_assign || '',
+          pm_qty:    a.pm_qty    != null ? a.pm_qty    : '',
+          pm_assign: a.pm_assign || '',
+          notes:     a.notes     || '',
+        };
+      });
+    }
+  } catch(e) { console.error('loadDayData assignments', e); }
+
+  renderPrepList();
+  updateSummary();
+}
+
+async function onDateChange() {
+  currentDate = document.getElementById('date-select').value;
+  showLoading(true);
+  await loadDayData(currentDate);
+  showLoading(false);
+}
+
+// ============================================================
+// SCHEDULED HOURS
+// ============================================================
+function saveSchedHours() {
+  const val = document.getElementById('sched-hours').value;
+  schedHours = val !== '' ? parseFloat(val) : null;
+  updateSummary();
+  if (schedHoursDebounce) clearTimeout(schedHoursDebounce);
+  schedHoursDebounce = setTimeout(async () => {
+    try {
+      const ex = await (await supa('rk_prep_days?location_id=eq.'+LOCATION_ID+'&prep_date=eq.'+currentDate+'&select=id')).json();
+      if (Array.isArray(ex) && ex.length > 0) {
+        await supa('rk_prep_days?location_id=eq.'+LOCATION_ID+'&prep_date=eq.'+currentDate, { method:'PATCH', body: JSON.stringify({ scheduled_hours: schedHours }) });
+      } else {
+        await supa('rk_prep_days', { method:'POST', prefer:'return=minimal', body: JSON.stringify({ location_id: LOCATION_ID, prep_date: currentDate, scheduled_hours: schedHours }) });
+      }
+    } catch(e) { console.error('saveSchedHours', e); }
+  }, 800);
+}
+
+// ============================================================
+// SAVE DAY
+// ============================================================
+async function saveDay() {
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  setStatus('saving', '⏳ Saving…');
+  try {
+    const now = new Date().toISOString();
+    const ex = await (await supa('rk_prep_days?location_id=eq.'+LOCATION_ID+'&prep_date=eq.'+currentDate+'&select=id')).json();
+    if (Array.isArray(ex) && ex.length > 0) {
+      await supa('rk_prep_days?location_id=eq.'+LOCATION_ID+'&prep_date=eq.'+currentDate, { method:'PATCH', body: JSON.stringify({ scheduled_hours: schedHours, saved_at: now }) });
+    } else {
+      await supa('rk_prep_days', { method:'POST', prefer:'return=minimal', body: JSON.stringify({ location_id: LOCATION_ID, prep_date: currentDate, scheduled_hours: schedHours, saved_at: now }) });
+    }
+    setStatus('saved', '✓ Saved ' + new Date(now).toLocaleTimeString('en-US', {hour:'numeric',minute:'2-digit'}));
+    showToast('List saved!');
+    await loadArchive();
+  } catch(e) {
+    console.error(e);
+    setStatus('error', '✗ Save failed');
+  }
+  btn.disabled = false;
+}
+
+// ============================================================
+// AUTO SAVE
+// ============================================================
+function triggerAutoSave() {
+  setStatus('saving', '⏳ Saving…');
+  if (saveDebounce) clearTimeout(saveDebounce);
+  saveDebounce = setTimeout(autoSave, 800);
+}
+
+async function autoSave() {
+  try {
+    const toUpsert = Object.entries(assignments)
+      .map(([itemId, a]) => ({
+        location_id: LOCATION_ID,
+        prep_date: currentDate,
+        item_id: parseInt(itemId),
+        on_hand: a.on_hand || null,
+        am_qty: a.am_qty !== '' ? parseFloat(a.am_qty) : null,
+        am_assign: a.am_assign || null,
+        pm_qty: a.pm_qty !== '' ? parseFloat(a.pm_qty) : null,
+        pm_assign: a.pm_assign || null,
+        notes: a.notes || null,
+      }))
+      .filter(a => !isNaN(a.item_id) && a.item_id > 0);
+
+    if (toUpsert.length > 0) {
+      await supa('rk_assignments', {
+        method:'POST', prefer:'resolution=merge-duplicates',
+        body: JSON.stringify(toUpsert)
+      });
+    }
+    setStatus('saved', '✓ Auto-saved');
+  } catch(e) {
+    console.error('autoSave', e);
+    setStatus('error', '✗ Save error');
+  }
+}
+
+// ============================================================
+// RENDER PREP LIST
+// ============================================================
+function renderPrepList() {
+  const container = document.getElementById('sections-container');
+  container.innerHTML = '';
+
+  // BOH group
+  const bohDiv = document.createElement('div');
+  bohDiv.className = 'print-page-boh';
+  const bohHdr = document.createElement('div');
+  bohHdr.className = 'group-header';
+  bohHdr.textContent = '🍳 Back of House';
+  bohDiv.appendChild(bohHdr);
+  SECTIONS.filter(s => s.group === 'BOH').forEach(sec => {
+    const block = buildSectionBlock(sec);
+    if (block) bohDiv.appendChild(block);
+  });
+  container.appendChild(bohDiv);
+
+  // FOH group
+  const fohDiv = document.createElement('div');
+  const fohHdr = document.createElement('div');
+  fohHdr.className = 'group-header';
+  fohHdr.textContent = '🥗 Front of House';
+  fohDiv.appendChild(fohHdr);
+  SECTIONS.filter(s => s.group === 'FOH').forEach(sec => {
+    const block = buildSectionBlock(sec);
+    if (block) fohDiv.appendChild(block);
+  });
+  container.appendChild(fohDiv);
+}
+
+function buildSectionBlock(secDef) {
+  const { name: section, isPortion } = secDef;
+  const items = prepItems.filter(i => i.section === section);
+  if (items.length === 0) return null;
+
+  const block = document.createElement('div');
+  block.className = 'section-block';
+  block.dataset.section = section;
+
+  const hdr = document.createElement('div');
+  hdr.className = 'section-header';
+  hdr.innerHTML = escHtml(section) + ' <span class="sec-count" id="sec-count-' + escHtml(section) + '"></span>';
+  block.appendChild(hdr);
+
+  const table = document.createElement('table');
+  table.className = 'prep-table';
+
+  if (isPortion) {
+    table.innerHTML = `<thead><tr>
+      <th style="min-width:160px">Item</th>
+      <th style="width:68px">Shelf Life</th>
+      <th style="width:72px">Daily Min</th>
+      <th style="width:62px">On Hand</th>
+      <th style="width:58px">AM Qty</th>
+      <th style="width:86px">AM Assign</th>
+      <th style="width:58px">PM Qty</th>
+      <th style="width:86px">PM Assign</th>
+      <th>Notes</th>
+    </tr></thead>`;
+  } else {
+    table.innerHTML = `<thead><tr>
+      <th style="min-width:140px">Item</th>
+      <th style="width:68px">Shelf Life</th>
+      <th style="width:65px">Prep Time</th>
+      <th style="width:78px">Recipe Amt</th>
+      <th style="width:72px">Daily Min</th>
+      <th style="width:72px">Build To</th>
+      <th style="width:62px">On Hand</th>
+      <th style="width:58px">AM Qty</th>
+      <th style="width:86px">AM Assign</th>
+      <th style="width:58px">PM Qty</th>
+      <th style="width:86px">PM Assign</th>
+      <th>Notes</th>
+    </tr></thead>`;
+  }
+
+  const tbody = document.createElement('tbody');
+  items.forEach(item => {
+    const id = String(item.id);
+    const a = assignments[id] || {};
+    const amQty = (a.am_qty !== undefined && a.am_qty !== '') ? a.am_qty : '';
+    const pmQty = (a.pm_qty !== undefined && a.pm_qty !== '') ? a.pm_qty : '';
+    const estMins = calcItemMins(item, (parseFloat(amQty)||0) + (parseFloat(pmQty)||0));
+
+    const staffOpts = (field) => '<option value="">—</option>' +
+      staff.map(s => `<option value="${escHtml(s.name)}" ${a[field]===s.name?'selected':''}>${escHtml(s.name)}</option>`).join('');
+
+    const tr = document.createElement('tr');
+    tr.dataset.itemId = id;
+
+    if (isPortion) {
+      tr.innerHTML = `
+        <td class="item-name">${escHtml(item.name)}</td>
+        <td><span class="item-sublabel">${escHtml(item.shelf_life||'')}</span></td>
+        <td><span class="locked-val">${escHtml(item.daily_min||'—')}</span></td>
+        <td><input class="on-hand-input" type="text" value="${escHtml(String(a.on_hand||''))}" data-id="${id}" onchange="onField(this,'on_hand')" /></td>
+        <td><input class="qty-input" type="number" min="0" step="0.5" value="${escHtml(String(amQty))}" data-id="${id}" data-field="am_qty" onchange="onQty(this)" oninput="onQty(this)" /></td>
+        <td><select class="assign-select" data-id="${id}" data-field="am_assign" onchange="onField(this,'am_assign')">${staffOpts('am_assign')}</select></td>
+        <td><input class="qty-input" type="number" min="0" step="0.5" value="${escHtml(String(pmQty))}" data-id="${id}" data-field="pm_qty" onchange="onQty(this)" oninput="onQty(this)" /></td>
+        <td><select class="assign-select" data-id="${id}" data-field="pm_assign" onchange="onField(this,'pm_assign')">${staffOpts('pm_assign')}</select></td>
+        <td><input class="notes-input" type="text" value="${escHtml(a.notes||'')}" data-id="${id}" onchange="onField(this,'notes')" /></td>
+      `;
+    } else {
+      tr.innerHTML = `
+        <td>
+          <div class="item-name">${escHtml(item.name)}</div>
+          <div class="item-time${estMins > 0 ? ' active' : ''}" id="time-${id}">${estMins > 0 ? estMins + ' min' : ''}</div>
+        </td>
+        <td><span class="item-sublabel">${escHtml(item.shelf_life||'')}</span></td>
+        <td><span class="item-sublabel" style="color:${item.prep_time > 0 ? 'var(--accent)' : 'var(--text-muted)'}">${item.prep_time > 0 ? item.prep_time + ' min' : '—'}</span></td>
+        <td><span class="locked-val">${escHtml(item.recipe_amt||'—')}</span></td>
+        <td><span class="locked-val">${escHtml(item.daily_min||'—')}</span></td>
+        <td><span class="locked-val">${escHtml(item.build_to||'—')}</span></td>
+        <td><input class="on-hand-input" type="text" value="${escHtml(String(a.on_hand||''))}" data-id="${id}" onchange="onField(this,'on_hand')" /></td>
+        <td><input class="qty-input" type="number" min="0" step="0.5" value="${escHtml(String(amQty))}" data-id="${id}" data-field="am_qty" onchange="onQty(this)" oninput="onQty(this)" /></td>
+        <td><select class="assign-select" data-id="${id}" data-field="am_assign" onchange="onField(this,'am_assign')">${staffOpts('am_assign')}</select></td>
+        <td><input class="qty-input" type="number" min="0" step="0.5" value="${escHtml(String(pmQty))}" data-id="${id}" data-field="pm_qty" onchange="onQty(this)" oninput="onQty(this)" /></td>
+        <td><select class="assign-select" data-id="${id}" data-field="pm_assign" onchange="onField(this,'pm_assign')">${staffOpts('pm_assign')}</select></td>
+        <td><input class="notes-input" type="text" value="${escHtml(a.notes||'')}" data-id="${id}" onchange="onField(this,'notes')" /></td>
+      `;
+    }
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  block.appendChild(table);
+  updateSectionCount(section);
+  return block;
+}
+
+// ============================================================
+// INPUT HANDLERS
+// ============================================================
+function onQty(el) {
+  const id = el.dataset.id, field = el.dataset.field;
+  if (!assignments[id]) assignments[id] = {};
+  assignments[id][field] = el.value;
+  const item = prepItems.find(i => String(i.id) === id);
+  if (item) {
+    const total = (parseFloat(assignments[id].am_qty)||0) + (parseFloat(assignments[id].pm_qty)||0);
+    const mins = calcItemMins(item, total);
+    const te = document.getElementById('time-' + id);
+    if (te) { te.textContent = mins > 0 ? mins + ' min' : ''; te.className = 'item-time' + (mins > 0 ? ' active' : ''); }
+  }
+  updateSectionCount(el.closest('.section-block')?.dataset?.section || '');
+  updateSummary();
+  triggerAutoSave();
+}
+
+function onField(el, field) {
+  const id = el.dataset.id;
+  if (!assignments[id]) assignments[id] = {};
+  assignments[id][field] = el.value || el.value;
+  if (field === 'am_assign' || field === 'pm_assign') updateSummary();
+  triggerAutoSave();
+}
+
+// ============================================================
+// CALCULATIONS
+// ============================================================
+function calcItemMins(item, totalQty) {
+  if (!totalQty || !item.prep_time) return 0;
+  return totalQty > 1 ? Math.round(item.prep_time * 1.3) : item.prep_time;
+}
+
+function updateSectionCount(section) {
+  const el = document.getElementById('sec-count-' + section);
+  if (!el) return;
+  const block = el.closest('.section-block');
+  if (!block) return;
+  let count = 0;
+  block.querySelectorAll('tr[data-item-id]').forEach(r => {
+    const am = r.querySelector('[data-field="am_qty"]');
+    const pm = r.querySelector('[data-field="pm_qty"]');
+    if ((am && parseFloat(am.value) > 0) || (pm && parseFloat(pm.value) > 0)) count++;
+  });
+  el.textContent = count > 0 ? count + ' items' : '';
+}
+
+function updateSummary() {
+  let items = 0, assigned = 0, mins = fixedBoh || 0;
+  prepItems.forEach(item => {
+    const a = assignments[String(item.id)];
+    if (!a) return;
+    const total = (parseFloat(a.am_qty)||0) + (parseFloat(a.pm_qty)||0);
+    if (total > 0) {
+      items++;
+      if (a.am_assign || a.pm_assign) assigned++;
+      mins += calcItemMins(item, total);
+    }
+  });
+  const estH = (mins / 60).toFixed(1);
+  document.getElementById('sum-items').textContent = items;
+  document.getElementById('sum-assigned').textContent = assigned;
+  document.getElementById('sum-hours').textContent = estH;
+  const sched = schedHours != null ? parseFloat(schedHours) : null;
+  document.getElementById('sum-sched').textContent = sched != null ? sched : '—';
+  const dw = document.getElementById('sum-delta-wrap');
+  const de = document.getElementById('sum-delta');
+  if (sched != null) {
+    const delta = parseFloat(estH) - sched;
+    de.textContent = (delta > 0 ? '+' : '') + delta.toFixed(1) + ' hrs';
+    dw.className = 'summary-item ' + (delta > 0 ? 'over' : 'under');
+  } else { de.textContent = '—'; dw.className = 'summary-item'; }
+}
+
+// ============================================================
+// SETTINGS — ITEMS TABLE
+// ============================================================
+function buildSettingsSectionTabs() {
+  const c = document.getElementById('settings-section-tabs');
+  if (!c) return;
+  c.innerHTML = SECTIONS.map((s, i) =>
+    `<div class="section-tab${i === settingsSectionIdx ? ' active' : ''}" onclick="switchSettingsSection(${i})">${escHtml(s.name)}</div>`
+  ).join('');
+}
+
+function switchSettingsSection(idx) {
+  settingsSectionIdx = idx;
+  buildSettingsSectionTabs();
+  renderSettingsItems(idx);
+}
+
+function renderSettingsItems(idx) {
+  const sec = SECTIONS[idx];
+  const isPortion = sec.isPortion;
+  const items = prepItems.filter(i => i.section === sec.name);
+  const tbody = document.getElementById('items-tbody');
+  if (!tbody) return;
+  const locked = managerPin && !pinUnlocked;
+  updatePinBanner();
+
+  // Update thead for portion dressings (no recipe_amt / build_to)
+  const thead = document.getElementById('items-thead-row');
+  if (thead) {
+    if (isPortion) {
+      thead.innerHTML = `<th style="width:22px;"></th><th style="min-width:180px;">Item Name</th><th style="width:80px;">Shelf Life</th><th style="width:90px;">Prep Time (min) 🔒</th><th colspan="2" style="width:110px;">Daily Min 🔒</th><th style="width:32px;"></th>`;
+    } else {
+      thead.innerHTML = `<th style="width:22px;"></th><th style="min-width:180px;">Item Name</th><th style="width:80px;">Shelf Life</th><th style="width:90px;">Prep Time (min) 🔒</th><th style="width:100px;">Recipe Amt 🔒</th><th style="width:100px;">Daily Min 🔒</th><th style="width:100px;">Build To 🔒</th><th style="width:32px;"></th>`;
+    }
+  }
+
+  if (items.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-state">No items in this section yet.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = items.map(item => {
+    const recipeTd = isPortion ? '' : `<td><input type="text" value="${escHtml(item.recipe_amt||'')}" ${locked?'disabled':''} placeholder="e.g. 2 qt" onchange="updateOverride(${item.id},'recipe_amt',this.value)" style="width:90px;" /></td>`;
+    const buildTd = isPortion ? '' : `<td><input type="text" value="${escHtml(item.build_to||'')}" ${locked?'disabled':''} placeholder="e.g. 12 qt" onchange="updateOverride(${item.id},'build_to',this.value)" style="width:90px;" /></td>`;
+    return `
+    <tr draggable="true" data-item-id="${item.id}"
+        ondragstart="dragStart(event,${item.id})" ondragover="dragOver(event)"
+        ondrop="dropItem(event,${item.id})" ondragleave="dragLeave(event)">
+      <td><span class="drag-handle">⠿</span></td>
+      <td><input type="text" value="${escHtml(item.name)}" onchange="updateItemField(${item.id},'name',this.value)" style="width:100%;" /></td>
+      <td><input type="text" value="${escHtml(item.shelf_life||'')}" onchange="updateItemField(${item.id},'shelf_life',this.value)" style="width:75px;" /></td>
+      <td><input type="number" min="0" value="${item.prep_time||0}" ${locked?'disabled':''} onchange="updateItemField(${item.id},'prep_time',this.value)" style="width:70px;" /></td>
+      ${recipeTd}
+      <td><input type="text" value="${escHtml(item.daily_min||'')}" ${locked?'disabled':''} placeholder="e.g. 4 qt" onchange="updateOverride(${item.id},'daily_min',this.value)" style="width:90px;" /></td>
+      ${buildTd}
+      <td><button class="btn-icon" onclick="deleteItem(${item.id})">🗑</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function updateItemField(id, field, val) {
+  const item = prepItems.find(i => i.id === id);
+  if (!item) return;
+  item[field] = field === 'prep_time' ? (parseFloat(val)||0) : val;
+  await supa('rk_prep_items?id=eq.'+id, { method:'PATCH', body: JSON.stringify({ [field]: item[field] }) });
+  renderPrepList();
+}
+
+async function updateOverride(itemId, field, val) {
+  const item = prepItems.find(i => i.id === itemId);
+  if (!item) return;
+  item[field] = val;
+  await supa('rk_item_overrides', {
+    method:'POST', prefer:'resolution=merge-duplicates',
+    body: JSON.stringify({ location_id: LOCATION_ID, item_id: itemId, [field]: val })
+  });
+  renderPrepList();
+}
+
+async function deleteItem(id) {
+  if (!confirm('Delete this item from ALL locations?')) return;
+  await supa('rk_prep_items?id=eq.'+id, { method:'DELETE' });
+  prepItems = prepItems.filter(i => i.id !== id);
+  renderSettingsItems(settingsSectionIdx);
+  renderPrepList();
+}
+
+function toggleAddForm() {
+  document.getElementById('add-item-form').classList.toggle('open');
+}
+
+function buildNewItemSectionDropdown() {
+  const sel = document.getElementById('new-item-section');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Section...</option>' +
+    SECTIONS.map(s => `<option value="${escHtml(s.name)}">${escHtml(s.name)}</option>`).join('');
+}
+
+async function addItem() {
+  const name = document.getElementById('new-item-name').value.trim();
+  const section = document.getElementById('new-item-section').value;
+  const mins = parseFloat(document.getElementById('new-item-mins').value) || 0;
+  if (!name || !section) { showToast('Enter item name and select a section'); return; }
+  const maxSort = Math.max(0, ...prepItems.filter(i => i.section === section).map(i => i.sort_order||0));
+  const r = await supa('rk_prep_items', { method:'POST', prefer:'return=representation', body: JSON.stringify({ name, section, prep_time: mins, sort_order: maxSort+1 }) });
+  const d = await r.json();
+  prepItems.push({ ...(Array.isArray(d) ? d[0] : d), recipe_amt:'', daily_min:'', build_to:'' });
+  const idx = SECTIONS.findIndex(s => s.name === section);
+  if (idx >= 0) switchSettingsSection(idx);
+  renderPrepList();
+  document.getElementById('new-item-name').value = '';
+  document.getElementById('new-item-mins').value = '';
+  document.getElementById('add-item-form').classList.remove('open');
+  showToast('Item added to all locations');
+}
+
+// ============================================================
+// DRAG TO REORDER
+// ============================================================
+let dragSrcId = null;
+function dragStart(e, id) { dragSrcId = id; e.currentTarget.classList.add('dragging'); }
+function dragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function dragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+async function dropItem(e, targetId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragSrcId || dragSrcId === targetId) return;
+  const sec = SECTIONS[settingsSectionIdx].name;
+  const items = prepItems.filter(i => i.section === sec);
+  const si = items.findIndex(i => i.id === dragSrcId);
+  const ti = items.findIndex(i => i.id === targetId);
+  if (si < 0 || ti < 0) return;
+  const [moved] = items.splice(si, 1);
+  items.splice(ti, 0, moved);
+  items.forEach((item, i) => { item.sort_order = i + 1; });
+  renderSettingsItems(settingsSectionIdx);
+  renderPrepList();
+  for (const item of items) {
+    await supa('rk_prep_items?id=eq.'+item.id, { method:'PATCH', body: JSON.stringify({ sort_order: item.sort_order }) });
+  }
+  dragSrcId = null;
+}
+
+// ============================================================
+// ARCHIVE
+// ============================================================
+async function loadArchive() {
+  try {
+    const r = await supa('rk_prep_days?location_id=eq.'+LOCATION_ID+'&order=prep_date.desc&limit=60&select=prep_date,scheduled_hours,saved_at');
+    const d = await r.json();
+    renderArchive(Array.isArray(d) ? d : []);
+  } catch(e) { console.error('loadArchive', e); }
+}
+
+function renderArchive(days) {
+  const c = document.getElementById('archive-list');
+  if (!c) return;
+  if (days.length === 0) { c.innerHTML = '<div class="empty-state">No saved days yet.</div>'; return; }
+  c.innerHTML = days.map((day, idx) => `
+    <div class="archive-card">
+      <div class="archive-card-header" onclick="document.getElementById('arc-${idx}').classList.toggle('open')">
+        <div>
+          <div class="archive-date">${fmtDateDisplay(new Date(day.prep_date+'T12:00:00'))}</div>
+          <div class="archive-meta">${day.scheduled_hours != null ? 'Scheduled: ' + day.scheduled_hours + ' hrs' : 'No scheduled hours'}</div>
+        </div>
+        <span class="archive-badge ${day.saved_at ? 'badge-saved' : 'badge-draft'}">${day.saved_at ? '✓ Saved' : 'Draft'}</span>
+      </div>
+      <div class="archive-detail" id="arc-${idx}">
+        <button class="btn-outline" style="font-size:12px;padding:6px 14px;" onclick="loadArchiveDay('${day.prep_date}')">Load this day on Prep List</button>
+      </div>
+    </div>`).join('');
+}
+
+async function loadArchiveDay(dateStr) {
+  const sel = document.getElementById('date-select');
+  let found = false;
+  for (const opt of sel.options) { if (opt.value === dateStr) { opt.selected = true; found = true; break; } }
+  if (!found) {
+    const opt = document.createElement('option');
+    opt.value = dateStr; opt.textContent = fmtDateDisplay(new Date(dateStr+'T12:00:00'));
+    sel.appendChild(opt); opt.selected = true;
+  }
+  currentDate = dateStr;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-prep').classList.add('active');
+  document.querySelector('nav button').classList.add('active');
+  showLoading(true);
+  await loadDayData(dateStr);
+  showLoading(false);
+}
+
+// ============================================================
+// LABOR DATA
+// ============================================================
+async function loadLaborData() {
+  laborData = [];
+  try {
+    const r = await supa('rk_prep_days?location_id=eq.'+LOCATION_ID+'&order=prep_date.desc&limit=60&select=prep_date,scheduled_hours');
+    if (!r.ok) return;
+    const days = await r.json();
+    if (!Array.isArray(days) || days.length === 0) return;
+    const recent = days.slice(0, 30);
+    const dates = recent.map(d => d.prep_date);
+    const ar = await supa('rk_assignments?location_id=eq.'+LOCATION_ID+'&prep_date=in.('+dates.join(',')+')'+'&select=prep_date,item_id,am_qty,pm_qty');
+    const allAsgn = ar.ok ? await ar.json() : [];
+
+    laborData = recent.map(day => {
+      const date = day.prep_date;
+      const schedHrs = day.scheduled_hours != null ? parseFloat(day.scheduled_hours) : null;
+      const dayAsgn = Array.isArray(allAsgn) ? allAsgn.filter(a => a.prep_date === date) : [];
+      let totalMins = fixedBoh || 0;
+      dayAsgn.forEach(a => {
+        const item = prepItems.find(i => i.id === a.item_id);
+        if (!item) return;
+        const qty = (parseFloat(a.am_qty)||0) + (parseFloat(a.pm_qty)||0);
+        if (qty > 0) totalMins += calcItemMins(item, qty);
+      });
+      const estH = parseFloat((totalMins/60).toFixed(2));
+      return {
+        date, est_hours: estH, sched_hours: schedHrs,
+        utilization: (schedHrs != null && schedHrs > 0) ? Math.round((estH/schedHrs)*100) : null,
+        delta: schedHrs != null ? parseFloat((estH-schedHrs).toFixed(2)) : null,
+      };
+    });
+    laborData.sort((a,b) => a.date.localeCompare(b.date));
+  } catch(e) { console.error('loadLaborData', e); }
+}
+
+function renderLaborTab() {
+  if (laborData.length === 0) {
+    document.getElementById('labor-tbody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-muted)">No data yet.</td></tr>';
+    document.getElementById('labor-summary-cards').innerHTML = '';
+    drawLaborChart([]);
+    return;
+  }
+  const withUtil = laborData.filter(d => d.utilization != null);
+  const avgUtil = withUtil.length ? Math.round(withUtil.reduce((s,d) => s+d.utilization,0)/withUtil.length) : null;
+  const avgEst = parseFloat((laborData.reduce((s,d) => s+d.est_hours,0)/laborData.length).toFixed(1));
+  const withSched = laborData.filter(d => d.sched_hours != null);
+  const avgSched = withSched.length ? parseFloat((withSched.reduce((s,d) => s+d.sched_hours,0)/withSched.length).toFixed(1)) : null;
+  const totalOver = laborData.filter(d => d.delta != null && d.delta > 0).length;
+  document.getElementById('labor-summary-cards').innerHTML = `
+    <div class="labor-summary-card"><div class="val">${avgUtil!=null?avgUtil+'%':'—'}</div><div class="lbl">Avg Utilized</div></div>
+    <div class="labor-summary-card"><div class="val">${avgEst}</div><div class="lbl">Avg Est. Hrs</div></div>
+    <div class="labor-summary-card"><div class="val">${avgSched!=null?avgSched:'—'}</div><div class="lbl">Avg Sched. Hrs</div></div>
+    <div class="labor-summary-card"><div class="val" style="color:${totalOver>0?'var(--red)':'var(--green)'}">${totalOver}</div><div class="lbl">Days Over</div></div>
+  `;
+  document.getElementById('labor-tbody').innerHTML = [...laborData].reverse().map(d => `<tr>
+    <td>${fmtDateDisplay(new Date(d.date+'T12:00:00'))}</td>
+    <td>${d.est_hours.toFixed(1)}</td>
+    <td>${d.sched_hours!=null?d.sched_hours.toFixed(1):'<span style="color:var(--text-muted);font-style:italic">not set</span>'}</td>
+    <td class="utilization ${d.utilization==null?'':d.utilization>100?'over':'under'}">${d.utilization!=null?d.utilization+'%':'—'}</td>
+    <td class="${d.delta==null?'':d.delta>0?'over':'under'}">${d.delta!=null?(d.delta>0?'+':'')+d.delta.toFixed(1)+' hrs':'—'}</td>
+  </tr>`).join('');
+  drawLaborChart(laborData);
+}
+
+function drawLaborChart(data) {
+  const canvas = document.getElementById('labor-chart');
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = (canvas.parentElement.getBoundingClientRect().width - 40);
+  const H = 200;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  canvas.style.width = W+'px'; canvas.style.height = H+'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0,0,W,H);
+  if (!data.length) { ctx.fillStyle='#aaa'; ctx.font='13px Trebuchet MS'; ctx.textAlign='center'; ctx.fillText('No data',W/2,H/2); return; }
+  const PAD={top:16,right:16,bottom:40,left:44};
+  const cW=W-PAD.left-PAD.right, cH=H-PAD.top-PAD.bottom;
+  const allV=data.flatMap(d=>d.sched_hours!=null?[d.est_hours,d.sched_hours]:[d.est_hours]);
+  const maxV=Math.ceil(Math.max(...allV)*1.15)||10;
+  const xS=i=>PAD.left+(i/(data.length-1||1))*cW;
+  const yS=v=>PAD.top+cH-(v/maxV)*cH;
+  ctx.strokeStyle='#e0dbd2'; ctx.lineWidth=1;
+  for (let i=0;i<=4;i++) { const v=(i/4)*maxV,y=yS(v); ctx.beginPath(); ctx.moveTo(PAD.left,y); ctx.lineTo(PAD.left+cW,y); ctx.stroke(); ctx.fillStyle='#7a7570'; ctx.font='10px Trebuchet MS'; ctx.textAlign='right'; ctx.fillText(v.toFixed(1),PAD.left-6,y+3); }
+  ctx.strokeStyle='#b0a898'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+  let inL=false;
+  data.forEach((d,i)=>{ if(d.sched_hours==null){inL=false;return;} const x=xS(i),y=yS(d.sched_hours); if(!inL){ctx.beginPath();ctx.moveTo(x,y);inL=true;}else{ctx.lineTo(x,y);ctx.stroke();ctx.beginPath();ctx.moveTo(x,y);} });
+  if(inL)ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.strokeStyle='#4a7c59'; ctx.lineWidth=2.5;
+  data.forEach((d,i)=>{ const x=xS(i),y=yS(d.est_hours); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); }); ctx.stroke();
+  data.forEach((d,i)=>{ ctx.beginPath(); ctx.arc(xS(i),yS(d.est_hours),4,0,Math.PI*2); ctx.fillStyle=(d.sched_hours!=null&&d.est_hours>d.sched_hours)?'#c8502a':'#4a7c59'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke(); });
+  const step=Math.ceil(data.length/10); ctx.fillStyle='#7a7570'; ctx.font='10px Trebuchet MS'; ctx.textAlign='center';
+  data.forEach((d,i)=>{ if(i%step!==0&&i!==data.length-1)return; ctx.fillText(new Date(d.date+'T12:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}),xS(i),H-PAD.bottom+14); });
+}
+
+function downloadLaborCSV() {
+  if (!laborData.length) { showToast('No data to export'); return; }
+  const headers = ['Date','Est. Hours','Sched. Hours','% Utilized','Over/Under (hrs)'];
+  const rows = [...laborData].reverse().map(d => [d.date, d.est_hours.toFixed(2), d.sched_hours!=null?d.sched_hours.toFixed(2):'', d.utilization!=null?d.utilization:'', d.delta!=null?d.delta.toFixed(2):'']);
+  const csv = [headers,...rows].map(r=>r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
+  a.download = 'RK_'+LOCATION_NAME.replace(/\s+/g,'_')+'_labor.csv';
+  a.click();
+}
+
+// ============================================================
+// UI HELPERS
+// ============================================================
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'labor') { showLoading(true); loadLaborData().then(() => { renderLaborTab(); showLoading(false); }); }
+  if (name === 'settings') { updatePinBanner(); renderStaffList(); }
+}
+
+function showLoading(show) { document.getElementById('loading').classList.toggle('hidden', !show); }
+function setStatus(cls, msg) { const el = document.getElementById('save-status'); el.className = 'save-status ' + cls; el.textContent = msg; }
+let toastTimer;
+function showToast(msg, dur=2500) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),dur); }
+function escHtml(str) { if(str==null)return''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ============================================================
+// START
+// ============================================================
+init();
+</script>
+</body>
+</html>
